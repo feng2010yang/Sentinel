@@ -26,11 +26,13 @@ import com.alibaba.csp.sentinel.dashboard.rule.DynamicRulePublisher;
 import com.alibaba.csp.sentinel.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -76,8 +78,8 @@ public class FlowControllerV2 {
                         entity.setId(entity.getClusterConfig().getFlowId());
                     }
                 }
+                rules = repository.saveAll(rules);
             }
-            rules = repository.saveAll(rules);
             return Result.ofSuccess(rules);
         } catch (Throwable throwable) {
             logger.error("Error when querying flow rules", throwable);
@@ -145,8 +147,20 @@ public class FlowControllerV2 {
         entity.setLimitApp(entity.getLimitApp().trim());
         entity.setResource(entity.getResource().trim());
         try {
+            List<FlowRuleEntity> rules = ruleProvider.getRules(entity.getApp());
+            if (rules != null && !rules.isEmpty()) {
+                entity.setId(rules.get(rules.size()-1).getId()+1);
+                rules.add(entity);
+            }else{
+                rules=new ArrayList<>();
+                entity.setId(1L);
+                rules.add(entity);
+            }
             entity = repository.save(entity);
-            publishRules(entity.getApp());
+            if (entity == null) {
+                return Result.ofFail(-1, "save entity fail");
+            }
+            rulePublisher.publish(entity.getApp(), rules);
         } catch (Throwable throwable) {
             logger.error("Failed to add flow rule", throwable);
             return Result.ofThrowable(-1, throwable);
@@ -188,7 +202,16 @@ public class FlowControllerV2 {
             if (entity == null) {
                 return Result.ofFail(-1, "save entity fail");
             }
-            publishRules(oldEntity.getApp());
+            List<FlowRuleEntity> rules = ruleProvider.getRules(entity.getApp());
+            if (rules != null && !rules.isEmpty()) {
+                for(FlowRuleEntity f:rules){
+                    if(f.getId().equals(id)){
+                        BeanUtils.copyProperties(entity, f);
+                        break;
+                    }
+                }
+                rulePublisher.publish(entity.getApp(), rules);
+            }
         } catch (Throwable throwable) {
             logger.error("Failed to update flow rule", throwable);
             return Result.ofThrowable(-1, throwable);
@@ -209,7 +232,16 @@ public class FlowControllerV2 {
         authUser.authTarget(oldEntity.getApp(), PrivilegeType.DELETE_RULE);
         try {
             repository.delete(id);
-            publishRules(oldEntity.getApp());
+            List<FlowRuleEntity> rules = ruleProvider.getRules(oldEntity.getApp());
+            if (rules != null && !rules.isEmpty()) {
+                for(FlowRuleEntity f:rules){
+                    if(f.getId().equals(id)){
+                        rules.remove(f);
+                        break;
+                    }
+                }
+                rulePublisher.publish(oldEntity.getApp(), rules);
+            }
         } catch (Exception e) {
             return Result.ofFail(-1, e.getMessage());
         }
