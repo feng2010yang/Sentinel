@@ -51,4 +51,18 @@ public class ZookeeperConfigUtil {
         }
         return stringBuilder.toString();
     }
+
+    public static String getSystemPath(String appName) {
+        StringBuilder stringBuilder = new StringBuilder(RULE_ROOT_PATH);
+
+        if (StringUtils.isBlank(appName)) {
+            return stringBuilder.toString();
+        }
+        if (appName.startsWith("/")) {
+            stringBuilder.append(appName).append("/system");
+        } else {
+            stringBuilder.append("/").append(appName).append("/system");
+        }
+        return stringBuilder.toString();
+    }
 }
