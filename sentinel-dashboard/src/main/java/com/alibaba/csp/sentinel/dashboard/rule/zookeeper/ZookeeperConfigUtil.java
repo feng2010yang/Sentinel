@@ -24,17 +24,30 @@ public class ZookeeperConfigUtil {
     public static final int RETRY_TIMES = 3;
     public static final int SLEEP_TIME = 1000;
 
-    public static String getPath(String appName) {
+    public static String getFlowPath(String appName) {
         StringBuilder stringBuilder = new StringBuilder(RULE_ROOT_PATH);
 
         if (StringUtils.isBlank(appName)) {
             return stringBuilder.toString();
         }
         if (appName.startsWith("/")) {
-            stringBuilder.append(appName);
+            stringBuilder.append(appName).append("/flow");
         } else {
-            stringBuilder.append("/")
-                    .append(appName);
+            stringBuilder.append("/").append(appName).append("/flow");
+        }
+        return stringBuilder.toString();
+    }
+
+    public static String getDegradePath(String appName) {
+        StringBuilder stringBuilder = new StringBuilder(RULE_ROOT_PATH);
+
+        if (StringUtils.isBlank(appName)) {
+            return stringBuilder.toString();
+        }
+        if (appName.startsWith("/")) {
+            stringBuilder.append(appName).append("/degrade");
+        } else {
+            stringBuilder.append("/").append(appName).append("/degrade");
         }
         return stringBuilder.toString();
     }
