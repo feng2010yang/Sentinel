@@ -27,6 +27,7 @@ import com.alibaba.csp.sentinel.slots.block.RuleConstant;
 import com.alibaba.csp.sentinel.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
@@ -201,6 +202,19 @@ public class DegradeController {
         entity.setGmtModified(date);
         try {
             entity = repository.save(entity);
+            if (entity == null) {
+                return Result.ofFail(-1, "save entity fail");
+            }
+            List<DegradeRuleEntity> rules = degradeRuleZookeeperProvider.getRules(entity.getApp());
+            if (rules != null && !rules.isEmpty()) {
+                for(DegradeRuleEntity f:rules){
+                    if(f.getId().equals(id)){
+                        BeanUtils.copyProperties(entity, f);
+                        break;
+                    }
+                }
+                degradeRuleZookeeperPublisher.publish(entity.getApp(), rules);
+            }
         } catch (Throwable throwable) {
             logger.error("save error:", throwable);
             return Result.ofThrowable(-1, throwable);
@@ -226,6 +240,16 @@ public class DegradeController {
         authUser.authTarget(oldEntity.getApp(), PrivilegeType.DELETE_RULE);
         try {
             repository.delete(id);
+            List<DegradeRuleEntity> rules = degradeRuleZookeeperProvider.getRules(oldEntity.getApp());
+            if (rules != null && !rules.isEmpty()) {
+                for(DegradeRuleEntity f:rules){
+                    if(f.getId().equals(id)){
+                        rules.remove(f);
+                        break;
+                    }
+                }
+                degradeRuleZookeeperPublisher.publish(oldEntity.getApp(), rules);
+            }
         } catch (Throwable throwable) {
             logger.error("delete error:", throwable);
             return Result.ofThrowable(-1, throwable);
